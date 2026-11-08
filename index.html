@@ -183,6 +183,18 @@ input,select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid 
     <p class="note" style="margin-top:10px">FC máx estimada por 208 − 0,7 × idade; com FC de repouso, faixas pela reserva cardíaca (Karvonen). Calorias estimadas pelo batimento (fórmula de Keytel), só com o peso preenchido.</p>
   </details>
 
+  <details class="panel" id="cloud">
+    <summary>Nuvem · GitHub <span class="note" id="cloudBadge" style="margin-left:auto;margin-right:10px">desligada</span></summary>
+    <div class="grid">
+      <label class="full">Repositório privado<input id="ghRepo" type="text" autocomplete="off" autocapitalize="off" spellcheck="false" value="joaomarcussp/cardio-dados"></label>
+      <label class="full">Token do GitHub<input id="ghToken" type="password" autocomplete="off" placeholder="github_pat_…"></label>
+    </div>
+    <div class="row"><button id="ghSave" style="flex:1">Salvar e testar</button><button id="ghSync" style="flex:1">Enviar pendentes</button></div>
+    <div class="row"><button id="ghRestore" style="flex:1">Restaurar da nuvem</button><button id="ghForget" class="danger" style="flex:1">Remover token</button></div>
+    <p class="note" id="cloudMsg" style="margin-top:10px"></p>
+    <p class="note" style="margin-top:8px">Cada treino salvo vira um arquivo em <b>treinos/</b> no repositório. O envio é automático e, sem internet, fica pendente até a conexão voltar. Apagar um treino aqui não apaga da nuvem. O token fica guardado só neste celular.</p>
+  </details>
+
   <details class="panel">
     <summary>Sem pulseira ou testando</summary>
     <div class="row">
@@ -441,8 +453,81 @@ function saveRecord(){
   const h=hist().filter(r=>r.id!==rec.id);h.unshift(rec);
   while(!store('cz2_hist',JSON.stringify(h))&&h.length>1)h.pop();
   saved=true;drop('cz2_cur');renderHistory(rec.id);toast('Treino salvo');
+  syncPending();
   return rec;
 }
+
+/* ---------- nuvem (GitHub) ---------- */
+const ghRepo=()=>(load('cz2_gh_repo')||$('ghRepo').value||'').trim().replace(/^https?:\/\/github\.com\//,'').replace(/\/$/,'');
+const ghToken=()=>load('cz2_gh_token')||'';
+function gh(path,opt={}){
+  return fetch('https://api.github.com/repos/'+ghRepo()+path,{...opt,cache:'no-store',headers:{'Authorization':'Bearer '+ghToken(),'Accept':'application/vnd.github+json','X-GitHub-Api-Version':'2022-11-28'}});
+}
+const b64=s=>{const by=new TextEncoder().encode(s);let bin='';for(let i=0;i<by.length;i+=8192)bin+=String.fromCharCode(...by.subarray(i,i+8192));return btoa(bin)};
+const unb64=s=>new TextDecoder().decode(Uint8Array.from(atob(s.replace(/\s/g,'')),c=>c.charCodeAt(0)));
+const ghErr=st=>st===401?'Token inválido ou expirado.':st===404?'Repositório não encontrado, ou o token não tem acesso a ele.':st===403?'O token não tem permissão de escrita (Contents: Read and write).':'Erro do GitHub ('+st+').';
+function cloudMsg(html){$('cloudMsg').innerHTML=html||''}
+function cloudStatus(){
+  const h=hist(),ok=h.filter(r=>r.synced).length;
+  $('cloudBadge').textContent=!ghToken()?'desligada':h.length?`${ok}/${h.length} na nuvem`:'conectada';
+  $('ghToken').placeholder=ghToken()?'token salvo ✓ (cole outro para trocar)':'github_pat_…';
+}
+function markSynced(id){const h=hist();const r=h.find(x=>x.id===id);if(r){r.synced=true;store('cz2_hist',JSON.stringify(h))}}
+let syncing=false;
+async function syncPending(){
+  if(syncing||!ghToken()||!ghRepo())return cloudStatus();
+  if(!navigator.onLine){cloudMsg('Sem internet. Os treinos pendentes vão quando a conexão voltar.');return cloudStatus()}
+  syncing=true;let sent=0,fail='';
+  try{
+    for(const r of hist().filter(x=>!x.synced)){
+      const body={...r};delete body.synced;body.resumo=summaryText(r);
+      const res=await gh(`/contents/treinos/${stamp(r.date)}.json`,{method:'PUT',body:JSON.stringify({message:`Treino ${stamp(r.date)} · ${r.label}`,content:b64(JSON.stringify(body,null,1))})});
+      if(res.ok||res.status===422){markSynced(r.id);sent++} // 422: arquivo já existe na nuvem
+      else{fail=ghErr(res.status);break}
+    }
+    cloudMsg(fail?`<span class="warn">${fail}</span>`:sent?`${sent} treino(s) enviado(s) para ${ghRepo()}.`:$('cloudMsg').innerHTML);
+    if(sent)toast(`${sent} treino(s) salvo(s) na nuvem`);
+  }catch(e){cloudMsg('<span class="warn">Sem conexão com o GitHub agora. Tento de novo depois.</span>')}
+  syncing=false;cloudStatus();if(sent)renderHistory();
+}
+$('ghSave').onclick=async()=>{
+  const repo=$('ghRepo').value.trim(),tok=$('ghToken').value.trim();
+  if(!/^[\w.-]+\/[\w.-]+$/.test(repo.replace(/^https?:\/\/github\.com\//,'').replace(/\/$/,''))){cloudMsg('<span class="warn">Use o formato usuario/repositorio.</span>');return}
+  store('cz2_gh_repo',repo);if(tok)store('cz2_gh_token',tok);
+  if(!ghToken()){cloudMsg('<span class="warn">Cole o token do GitHub.</span>');return}
+  $('ghToken').value='';cloudMsg('Testando…');
+  try{
+    const r=await gh('');
+    if(!r.ok){cloudMsg(`<span class="warn">${ghErr(r.status)}</span>`);return cloudStatus()}
+    const j=await r.json();
+    cloudMsg(j.private?`Conectado a <b>${j.full_name}</b> (privado).`:`<span class="warn">Conectado, mas ${j.full_name} é público: qualquer pessoa verá seus treinos.</span>`);
+    cloudStatus();syncPending();
+  }catch(e){cloudMsg('<span class="warn">Sem conexão com o GitHub.</span>')}
+};
+$('ghSync').onclick=()=>{if(!ghToken()){cloudMsg('<span class="warn">Configure o token primeiro.</span>');return}syncPending()};
+let forgetArm=false;
+$('ghForget').onclick=()=>{
+  if(!forgetArm){forgetArm=true;$('ghForget').textContent='Confirmar';setTimeout(()=>{forgetArm=false;$('ghForget').textContent='Remover token'},3000);return}
+  drop('cz2_gh_token');cloudMsg('Token removido deste celular. Os treinos já enviados continuam no GitHub.');cloudStatus();renderHistory();
+};
+$('ghRestore').onclick=async()=>{
+  if(!ghToken()){cloudMsg('<span class="warn">Configure o token primeiro.</span>');return}
+  cloudMsg('Buscando treinos na nuvem…');
+  try{
+    const r=await gh('/contents/treinos');
+    if(r.status===404){cloudMsg('Ainda não há treinos na nuvem.');return}
+    if(!r.ok){cloudMsg(`<span class="warn">${ghErr(r.status)}</span>`);return}
+    const files=(await r.json()).filter(f=>f.name.endsWith('.json'));
+    const h=hist(),ids=new Set(h.map(x=>x.id));let added=0;
+    for(const f of files){
+      const fr=await gh('/contents/'+f.path);if(!fr.ok)continue;
+      try{const rec=JSON.parse(unb64((await fr.json()).content));if(!rec.id||ids.has(rec.id))continue;delete rec.resumo;rec.synced=true;h.push(rec);ids.add(rec.id);added++}catch(e){}
+    }
+    h.sort((a,b)=>b.date-a.date);store('cz2_hist',JSON.stringify(h));renderHistory();cloudStatus();
+    cloudMsg(added?`${added} treino(s) restaurado(s) da nuvem.`:'Todos os treinos da nuvem já estão neste celular.');
+  }catch(e){cloudMsg('<span class="warn">Sem conexão com o GitHub.</span>')}
+};
+window.addEventListener('online',syncPending);
 
 /* ---------- histórico ---------- */
 function realTxt(p){return p.kind==='work'?`pico ${p.max}`:p.kind==='rest'?`fim ${p.last} (−${p.max-p.last})`:`média ${p.avg}`}
@@ -467,7 +552,7 @@ async function copyText(text){
 function renderHistory(openId){
   const h=hist(),box=$('histList');
   $('histEmpty').hidden=h.length>0;$('histAll').hidden=!h.length;
-  box.innerHTML=h.map(r=>`<li data-id="${r.id}"><button class="hrow" aria-expanded="false"><span><b>${dt(r.date)}</b><span class="note">${r.label} · ${fmt(r.done)}</span></span><span class="num">${r.avg} bpm · ${r.inPct}%${r.kcal?` · ${r.kcal} kcal`:''}</span></button><div class="hdet" hidden></div></li>`).join('');
+  box.innerHTML=h.map(r=>`<li data-id="${r.id}"><button class="hrow" aria-expanded="false"><span><b>${dt(r.date)}</b><span class="note">${r.label} · ${fmt(r.done)}${ghToken()?(r.synced?' · na nuvem ✓':' · nuvem pendente'):''}</span></span><span class="num">${r.avg} bpm · ${r.inPct}%${r.kcal?` · ${r.kcal} kcal`:''}</span></button><div class="hdet" hidden></div></li>`).join('');
   box.querySelectorAll('li').forEach(li=>{
     const r=h.find(x=>String(x.id)===li.dataset.id), btn=li.querySelector('.hrow'), det=li.querySelector('.hdet');
     const open=()=>{
@@ -582,7 +667,8 @@ SETTINGS.forEach(k=>{
   });
 });
 if(!navigator.bluetooth){$('btNote').innerHTML='<span class="warn">Bluetooth indisponível aqui.</span> Abra pelo link https no Chrome do Android.'}
-build();restore();renderHistory();
+{const rp=load('cz2_gh_repo');if(rp)$('ghRepo').value=rp}
+build();restore();renderHistory();cloudStatus();syncPending();
 </script>
 </body>
 </html>
