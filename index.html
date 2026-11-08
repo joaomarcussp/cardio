@@ -46,7 +46,7 @@ h1{font-family:var(--display);font-size:1.3rem;font-weight:700;letter-spacing:.0
 .live.low .hr{color:var(--low)} .live.high .hr{color:var(--high)} .live.in .hr{color:var(--ok)}
 .cue{font-family:var(--display);font-weight:700;font-size:1.5rem;text-align:right;letter-spacing:.04em}
 .live.low .cue{color:var(--low)} .live.high .cue{color:var(--high)} .live.in .cue{color:var(--ok)}
-.tgt{grid-column:1/-1;display:flex;justify-content:space-between;color:var(--muted);font-size:.9rem}
+.tgt{grid-column:1/-1;display:flex;justify-content:space-between;gap:8px;color:var(--muted);font-size:.9rem}
 .tgt b{color:var(--fg)}
 .zbar{grid-column:1/-1;position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-top:10px}
 .zbar div{height:10px;border-radius:3px;opacity:.4}
@@ -54,6 +54,7 @@ h1{font-family:var(--display);font-size:1.3rem;font-weight:700;letter-spacing:.0
 .marker{position:absolute;top:-6px;width:4px;height:22px;background:var(--fg);border-radius:2px;transform:translateX(-50%);transition:left .4s}
 .zlab{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,1fr);font-size:.7rem;color:var(--muted)}
 
+.banner{border-color:var(--z3);font-size:.9rem}
 .clock{display:flex;flex-direction:column;gap:4px}
 .time{font-size:3.4rem;font-weight:600;line-height:1;text-align:center}
 .sub{display:flex;justify-content:space-between;font-size:.9rem;color:var(--muted)}
@@ -66,13 +67,28 @@ h1{font-family:var(--display);font-size:1.3rem;font-weight:700;letter-spacing:.0
 button{font:inherit;font-weight:600;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:15px;cursor:pointer}
 button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-family:var(--display);font-size:1.25rem;letter-spacing:.04em}
 button.bt{width:100%;border-color:var(--fg)}
+button.danger{color:var(--high)}
 button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 .note{font-size:.8rem;color:var(--muted);margin:0}
 .warn{color:var(--high);font-weight:600}
 
-.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;margin-top:10px}
-.stats b{display:block;font-family:var(--display);font-size:1.5rem;font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;text-align:center;margin-top:10px}
+.stats b{display:block;font-family:var(--display);font-size:1.3rem;font-variant-numeric:tabular-nums}
 canvas{width:100%;height:150px;display:block;margin-top:8px}
+
+.hist{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column}
+.hist li{border-top:1px solid var(--line)}
+.hrow{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;border:0;border-radius:0;background:none;padding:12px 0}
+.hrow>span:first-child{display:flex;flex-direction:column;min-width:0}
+.hrow .num{font-size:.85rem;white-space:nowrap}
+.hdet{padding:0 0 14px;display:flex;flex-direction:column;gap:10px}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+th,td{text-align:left;padding:6px 4px;border-bottom:1px solid var(--line)}
+th{font-size:.7rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+td.num{font-family:var(--display);white-space:nowrap}
+.hbtns{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px}
+.hbtns button{padding:11px 6px;font-size:.85rem}
 
 details summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between}
 details summary::-webkit-details-marker{display:none}
@@ -85,6 +101,7 @@ input,select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid 
 .row{display:flex;gap:10px;margin-top:10px}
 .row input{flex:1;font-family:var(--display);font-size:1.2rem}
 .row button{padding:11px 16px}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(18px + env(safe-area-inset-bottom,0px));background:var(--fg);color:var(--bg);padding:10px 16px;border-radius:10px;font-weight:600;font-size:.9rem;max-width:calc(100% - 32px);z-index:5}
 @media (prefers-reduced-motion:reduce){.marker{transition:none}.pill.wait i{animation:none}}
 </style>
 </head>
@@ -97,6 +114,8 @@ input,select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid 
 
   <button class="bt" id="btBtn">Conectar pulseira</button>
   <p class="note" id="btNote">Na pulseira: Configurações › HR Data Broadcasts › ativar. Depois toque em Conectar.</p>
+
+  <section class="panel banner" id="banner" hidden></section>
 
   <section class="panel live" id="live" aria-live="polite">
     <div class="hr num"><span id="hr">--</span><small>bpm</small></div>
@@ -118,9 +137,9 @@ input,select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid 
 
   <div class="controls">
     <button class="primary" id="startBtn">INICIAR</button>
-    <button id="resetBtn">Zerar</button>
+    <button id="endBtn">Finalizar</button>
   </div>
-  <p class="note" id="resetNote" hidden>Toque em Zerar de novo para confirmar.</p>
+  <p class="note" id="ctrlNote" hidden></p>
 
   <section class="panel">
     <span class="lbl">Batimentos no treino</span>
@@ -129,14 +148,25 @@ input,select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid 
       <div><b id="sIn">0%</b><span class="note">na faixa</span></div>
       <div><b id="sAvg">--</b><span class="note">média</span></div>
       <div><b id="sMax">--</b><span class="note">máxima</span></div>
+      <div><b id="sKcal">--</b><span class="note">kcal</span></div>
     </div>
+    <p class="note" style="margin-top:8px">O treino é salvo no celular a cada 5 s. Se a página fechar, ele volta quando você abrir de novo.</p>
+  </section>
+
+  <section class="panel">
+    <span class="lbl">Treinos salvos</span>
+    <p class="note" id="histEmpty" style="margin-top:8px">Nenhum treino salvo ainda. Ao terminar ou tocar em Finalizar, o treino aparece aqui.</p>
+    <ul class="hist" id="histList"></ul>
+    <div class="row" id="histAll" hidden><button id="exportAll" style="flex:1">Baixar todos (backup)</button></div>
   </section>
 
   <details class="panel" id="cfg" open>
     <summary>Seus dados e avisos</summary>
     <div class="grid">
       <label>Idade<input id="age" type="number" inputmode="numeric" min="14" max="90" value="34"></label>
-      <label>FC repouso (opcional)<input id="rest" type="number" inputmode="numeric" min="35" max="110" value="70"></label>
+      <label>FC repouso<input id="rest" type="number" inputmode="numeric" min="35" max="110" value="70"></label>
+      <label>Peso (kg)<input id="weight" type="number" inputmode="decimal" min="35" max="250" placeholder="p/ calorias"></label>
+      <label>Sexo<select id="sex"><option value="m">Masculino</option><option value="f">Feminino</option></select></label>
       <label class="full">Treino
         <select id="mode"><option value="cont">Contínuo · Zona 2</option><option value="hiit">HIIT spinning · 30 min (6 tiros)</option></select>
       </label>
@@ -150,7 +180,7 @@ input,select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid 
         <select id="sound"><option value="voice">Voz + vibração</option><option value="beep">Bipe + vibração</option><option value="off">Silencioso</option></select>
       </label>
     </div>
-    <p class="note" style="margin-top:10px">FC máx estimada por 208 − 0,7 × idade. Com FC de repouso, usa reserva cardíaca (Karvonen). O app avisa quando você fica 12 s fora da faixa e repete a cada 30 s.</p>
+    <p class="note" style="margin-top:10px">FC máx estimada por 208 − 0,7 × idade; com FC de repouso, faixas pela reserva cardíaca (Karvonen). Calorias estimadas pelo batimento (fórmula de Keytel), só com o peso preenchido.</p>
   </details>
 
   <details class="panel">
@@ -162,24 +192,28 @@ input,select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid 
     <div class="row"><button id="demoBtn" style="flex:1">Simular batimentos (teste)</button></div>
   </details>
 </div>
+<div class="toast" id="toast" role="status" hidden></div>
 
 <script>
 const $=id=>document.getElementById(id);
-const store=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const store=(k,v)=>{try{localStorage.setItem(k,v);return true}catch(e){return false}};
 const load=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const drop=k=>{try{localStorage.removeItem(k)}catch(e){}};
+const SETTINGS=['age','rest','weight','sex','mode','dur','inten','sound'];
+const newStat=()=>({inS:0,n:0,sum:0,max:0,kcal:0});
 
 let TOTAL=3600, phases=[];
-let running=false,startT=0,acc=0,timer=null,lastPhase=-1,lastSec=-1,wake=null,resetArmed=false;
-let readings=[], source='none', series=[], stat={inS:0,n:0,sum:0,max:0};
+let running=false,startT=0,acc=0,lastPhase=-1,lastSec=-1,wake=null,armed=false;
+let readings=[], source='none', series=[], stat=newStat(), startedAt=0, saved=false;
 let zstate='in', outSince=0, lastCue=0, cuedOut=false, phaseStart=0;
 let device=null, hrChar=null, userDisc=false, retries=0, demoTimer=null;
 
-/* ---------- zonas ---------- */
+/* ---------- zonas e fases ---------- */
 function cfg(){
   const age=Math.min(90,Math.max(14,+$('age').value||30));
   const rest=+$('rest').value||0, max=Math.round(208-0.7*age);
   const useK=rest>=35&&rest<max-40;
-  return {rest,max,useK,bpm:p=>Math.round(useK?rest+(max-rest)*p:max*p)};
+  return {age,rest,max,useK,bpm:p=>Math.round(useK?rest+(max-rest)*p:max*p)};
 }
 const HIIT={warm:7,reps:6,work:1,rest:2,cool:5};
 function build(){
@@ -206,13 +240,20 @@ function build(){
   phases=phases.map(ph=>({...ph,lo:c.bpm(ph.p[0]),hi:c.bpm(ph.p[1])}));
   $('track').querySelectorAll('span').forEach(s=>s.remove());
   phases.forEach(ph=>{const s=document.createElement('span');s.style.width=((ph.to-ph.from)/TOTAL*100)+'%';s.style.background=`var(${ph.col})`;$('track').insertBefore(s,$('fill'))});
-  ['age','rest','mode','dur','inten','sound'].forEach(k=>store('cz2_'+k,$(k).value));
+  SETTINGS.forEach(k=>store('cz2_'+k,$(k).value));
   tick(); renderLive(); draw();
 }
+const modeLabel=()=>$('mode').value==='hiit'?'HIIT spinning':`Zona 2 contínuo · ${TOTAL/60} min`;
 const fmt=s=>{s=Math.max(0,Math.floor(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
+const dt=ms=>new Date(ms).toLocaleString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
 const elapsed=()=>Math.min(TOTAL,acc+(running?(Date.now()-startT)/1000:0));
 const phaseAt=t=>t>=TOTAL?phases.length-1:Math.max(0,phases.findIndex(p=>t>=p.from&&t<p.to));
 function pctOf(bpm){const c=cfg();return c.useK?(bpm-c.rest)/(c.max-c.rest):bpm/c.max}
+function keytel(hr){ // kcal/min estimadas pelo batimento
+  const w=+$('weight').value,a=cfg().age; if(!w)return 0;
+  const k=$('sex').value==='f'?(-20.4022+0.4472*hr-0.1263*w+0.074*a)/4.184:(-55.0969+0.6309*hr+0.1988*w+0.2017*a)/4.184;
+  return Math.max(0,k);
+}
 
 /* ---------- batimento atual ---------- */
 function currentHR(){
@@ -228,10 +269,7 @@ function onHR(bpm){
   readings=readings.filter(r=>now-r.t<=130000);
   renderLive();
 }
-function classify(hr,ph){
-  const m=zstate==='in'?2:0;
-  if(hr<ph.lo-m)return 'low'; if(hr>ph.hi+m)return 'high'; return 'in';
-}
+function classify(hr,ph){const m=zstate==='in'?2:0;if(hr<ph.lo-m)return 'low';if(hr>ph.hi+m)return 'high';return 'in'}
 function renderLive(){
   const ph=phases[phaseAt(elapsed())], hr=currentHR(), live=$('live');
   $('tgt').textContent=ph.lo+'–'+ph.hi; $('zname').textContent=ph.zone;
@@ -273,7 +311,7 @@ function sayPhase(ph){
 }
 function coach(hr,ph,now){
   if(ph.kind==='work') return; // no tiro o batimento sobe com atraso: guie pelo esforço
-  if(now-phaseStart<45000) return; // dá tempo do coração responder à troca de fase
+  if(now-phaseStart<45000) return;
   const ns=classify(hr,ph);
   if(ns!==zstate){
     if(ns==='in'&&cuedOut){say('Boa. Na faixa.','in');cuedOut=false}
@@ -302,49 +340,155 @@ function tick(){
     if(nx&&nx.kind==='work'&&ph.to-s===10)say('Dez segundos para o tiro.');
     const hr=currentHR();
     if(hr!=null){
-      series.push({s,bpm:hr});
-      stat.n++;stat.sum+=hr;stat.max=Math.max(stat.max,hr);
+      series.push([s,hr]);
+      stat.n++;stat.sum+=hr;stat.max=Math.max(stat.max,hr);stat.kcal+=keytel(hr)/60;
       if(hr>=ph.lo&&hr<=ph.hi)stat.inS++;
       coach(hr,ph,now);
       if(s>0&&s%300===0&&s<TOTAL&&$('mode').value!=='hiit'&&$('sound').value==='voice')say(`${s/60} minutos. Batimento ${hr}.`);
     }
+    if(s%5===0)autosave();
     renderStats(); draw();
   }
   renderLive();
   if(t>=TOTAL&&running){
     running=false;acc=TOTAL;$('startBtn').textContent='FIM';releaseWake();
     say(`Treino concluído. ${stat.n?Math.round(stat.inS/stat.n*100):0} por cento do tempo na faixa.`);
+    saveRecord();
   }
 }
 function renderStats(){
   $('sIn').textContent=stat.n?Math.round(stat.inS/stat.n*100)+'%':'0%';
   $('sAvg').textContent=stat.n?Math.round(stat.sum/stat.n):'--';
   $('sMax').textContent=stat.max||'--';
+  $('sKcal').textContent=stat.kcal?Math.round(stat.kcal):'--';
 }
-setInterval(()=>{tick()},250);
+setInterval(tick,250);
 
 async function getWake(){try{wake=await navigator.wakeLock.request('screen')}catch(e){wake=null}}
 function releaseWake(){try{wake&&wake.release()}catch(e){}wake=null}
-document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&running)getWake()});
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&running)getWake();else autosave()});
+window.addEventListener('pagehide',autosave);
+
+function note(txt){$('ctrlNote').textContent=txt;$('ctrlNote').hidden=!txt}
+let toastT=null;
+function toast(txt){const t=$('toast');t.textContent=txt;t.hidden=false;clearTimeout(toastT);toastT=setTimeout(()=>t.hidden=true,3500)}
 
 $('startBtn').onclick=()=>{
   if(elapsed()>=TOTAL)return;
   try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}
-  if(running){acc=elapsed();running=false;$('startBtn').textContent='CONTINUAR';releaseWake();say('Pausado.')}
+  if(running){acc=elapsed();running=false;$('startBtn').textContent='CONTINUAR';releaseWake();autosave();say('Pausado.')}
   else{
     const first=elapsed()===0;
-    startT=Date.now();running=true;$('startBtn').textContent='PAUSAR';getWake();
-    if(first){phaseStart=Date.now();const ph=phases[0];say(`Começando. ${ph.name}, faixa ${ph.lo} a ${ph.hi}.`)}
-    lastPhase=phaseAt(elapsed());
+    if(first){startedAt=Date.now();saved=false}
+    startT=Date.now();running=true;$('startBtn').textContent='PAUSAR';getWake();$('banner').hidden=true;
+    phaseStart=Date.now();lastPhase=phaseAt(elapsed());
+    if(first){const ph=phases[0];say(`Começando. ${ph.name}, faixa ${ph.lo} a ${ph.hi}.`)}
   }
   $('cfg').open=false; tick();
 };
-$('resetBtn').onclick=()=>{
-  if(elapsed()>0&&!resetArmed){resetArmed=true;$('resetNote').textContent='Toque em Zerar de novo para confirmar.';$('resetNote').hidden=false;setTimeout(()=>{resetArmed=false;$('resetNote').hidden=true},3000);return}
-  resetArmed=false;$('resetNote').hidden=true;running=false;acc=0;lastPhase=-1;lastSec=-1;
-  series=[];stat={inS:0,n:0,sum:0,max:0};zstate='in';cuedOut=false;lastCue=0;
-  $('startBtn').textContent='INICIAR';releaseWake();renderStats();tick();draw();
+$('endBtn').onclick=()=>{
+  if(saved){resetSession();return}
+  if(elapsed()===0)return;
+  if(!armed){armed=true;note('Toque em Finalizar de novo para salvar e encerrar.');setTimeout(()=>{armed=false;note('')},3000);return}
+  armed=false;note('');
+  if(running){acc=elapsed();running=false;releaseWake()}
+  if(!saveRecord())toast('Treino curto demais para salvar (menos de 30 s com batimento).');
+  resetSession();
 };
+function resetSession(){
+  running=false;acc=0;lastPhase=-1;lastSec=-1;series=[];stat=newStat();startedAt=0;saved=false;
+  zstate='in';cuedOut=false;lastCue=0;$('startBtn').textContent='INICIAR';$('banner').hidden=true;
+  releaseWake();drop('cz2_cur');renderStats();tick();draw();
+}
+
+/* ---------- salvamento ---------- */
+function autosave(){
+  if(saved||elapsed()===0)return;
+  store('cz2_cur',JSON.stringify({startedAt,mode:$('mode').value,dur:$('dur').value,inten:$('inten').value,acc:elapsed(),series,stat}));
+}
+function restore(){
+  let c=null;try{c=JSON.parse(load('cz2_cur')||'null')}catch(e){}
+  if(!c||!c.acc)return;
+  $('mode').value=c.mode;$('dur').value=c.dur;$('inten').value=c.inten;build();
+  acc=Math.min(c.acc,TOTAL);series=c.series||[];stat=Object.assign(newStat(),c.stat);startedAt=c.startedAt||Date.now();
+  lastSec=series.length?series[series.length-1][0]:-1;
+  $('startBtn').textContent=acc>=TOTAL?'FIM':'CONTINUAR';
+  $('banner').hidden=false;
+  $('banner').innerHTML=`<b>Treino de ${dt(startedAt)} recuperado</b> (${fmt(acc)} feitos). Toque em Continuar para seguir ou em Finalizar duas vezes para salvar.`;
+  $('cfg').open=false;renderStats();tick();draw();
+}
+function hist(){try{return JSON.parse(load('cz2_hist')||'[]')}catch(e){return []}}
+function downsample(pts,step){
+  const out=[];let b=-1,sum=0,n=0;
+  pts.forEach(([s,v])=>{const k=Math.floor(s/step);if(k!==b){if(n)out.push([b*step,Math.round(sum/n)]);b=k;sum=0;n=0}sum+=v;n++});
+  if(n)out.push([b*step,Math.round(sum/n)]);return out;
+}
+function phaseSummary(){
+  return phases.map(ph=>{
+    const v=series.filter(([s])=>s>=ph.from&&s<ph.to).map(x=>x[1]);
+    if(!v.length)return null;
+    return {name:ph.name,kind:ph.kind,from:ph.from,to:ph.to,lo:ph.lo,hi:ph.hi,
+      avg:Math.round(v.reduce((a,b)=>a+b,0)/v.length),min:Math.min(...v),max:Math.max(...v),first:v[0],last:v[v.length-1]};
+  }).filter(Boolean);
+}
+function saveRecord(){
+  if(saved||series.length<30)return null;
+  const c=cfg();
+  const rec={id:startedAt||Date.now(),date:startedAt||Date.now(),mode:$('mode').value,label:modeLabel(),planned:TOTAL,done:Math.floor(elapsed()),
+    avg:Math.round(stat.sum/stat.n),max:stat.max,inPct:Math.round(stat.inS/stat.n*100),kcal:Math.round(stat.kcal)||null,
+    cfg:{age:c.age,rest:c.rest,weight:+$('weight').value||null},bands:phases.map(p=>[p.from,p.to,p.lo,p.hi]),
+    phases:phaseSummary(),pts:downsample(series,5)};
+  const h=hist().filter(r=>r.id!==rec.id);h.unshift(rec);
+  while(!store('cz2_hist',JSON.stringify(h))&&h.length>1)h.pop();
+  saved=true;drop('cz2_cur');renderHistory(rec.id);toast('Treino salvo');
+  return rec;
+}
+
+/* ---------- histórico ---------- */
+function realTxt(p){return p.kind==='work'?`pico ${p.max}`:p.kind==='rest'?`fim ${p.last} (−${p.max-p.last})`:`média ${p.avg}`}
+function summaryText(r){
+  const L=[`Treino ${dt(r.date)} · ${r.label} · ${fmt(r.done)} de ${fmt(r.planned)}`,
+    `Média ${r.avg} bpm · máx ${r.max} · ${r.inPct}% na faixa${r.kcal?` · ~${r.kcal} kcal`:''} · idade ${r.cfg.age}, FC repouso ${r.cfg.rest||'—'}`,'Fases:'];
+  r.phases.forEach(p=>L.push(`- ${p.name} (${fmt(p.from)}–${fmt(p.to)}) alvo ${p.lo}–${p.hi}: média ${p.avg}, mín ${p.min}, máx ${p.max}, início ${p.first}, fim ${p.last}`));
+  L.push('Batimento a cada 15 s: '+downsample(r.pts,15).map(x=>x[1]).join(','));
+  return L.join('\n');
+}
+function download(name,text,type){
+  try{const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([text],{type}));a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1000)}
+  catch(e){toast('Não foi possível baixar o arquivo.')}
+}
+const stamp=ms=>{const d=new Date(ms),p=n=>String(n).padStart(2,'0');return `${d.getFullYear()}-${p(d.getMonth()+1)}-${p(d.getDate())}-${p(d.getHours())}${p(d.getMinutes())}`};
+async function copyText(text){
+  try{await navigator.clipboard.writeText(text);toast('Resumo copiado. Cole na conversa com o Claude.');return}catch(e){}
+  const ta=document.createElement('textarea');ta.value=text;document.body.appendChild(ta);ta.select();
+  try{document.execCommand('copy');toast('Resumo copiado.')}catch(e){toast('Selecione o texto e copie manualmente.')}
+  ta.remove();
+}
+function renderHistory(openId){
+  const h=hist(),box=$('histList');
+  $('histEmpty').hidden=h.length>0;$('histAll').hidden=!h.length;
+  box.innerHTML=h.map(r=>`<li data-id="${r.id}"><button class="hrow" aria-expanded="false"><span><b>${dt(r.date)}</b><span class="note">${r.label} · ${fmt(r.done)}</span></span><span class="num">${r.avg} bpm · ${r.inPct}%${r.kcal?` · ${r.kcal} kcal`:''}</span></button><div class="hdet" hidden></div></li>`).join('');
+  box.querySelectorAll('li').forEach(li=>{
+    const r=h.find(x=>String(x.id)===li.dataset.id), btn=li.querySelector('.hrow'), det=li.querySelector('.hdet');
+    const open=()=>{
+      det.hidden=false;btn.setAttribute('aria-expanded','true');
+      det.innerHTML=`<canvas aria-label="Gráfico do treino"></canvas>
+        <div class="tbl"><table><thead><tr><th>Fase</th><th>Alvo</th><th>Real</th></tr></thead><tbody>${r.phases.map(p=>`<tr><td>${p.name}</td><td class="num">${p.lo}–${p.hi}</td><td class="num">${realTxt(p)}</td></tr>`).join('')}</tbody></table></div>
+        <div class="hbtns"><button data-act="copy">Copiar resumo</button><button data-act="csv">Baixar CSV</button><button data-act="del" class="danger">Apagar</button></div>`;
+      drawChart(det.querySelector('canvas'),r.pts,r.bands,r.planned,r.max);
+      det.querySelector('[data-act=copy]').onclick=()=>copyText(summaryText(r));
+      det.querySelector('[data-act=csv]').onclick=()=>download(`treino-${stamp(r.date)}.csv`,'segundo,bpm\n'+r.pts.map(p=>p.join(',')).join('\n'),'text/csv');
+      const del=det.querySelector('[data-act=del]');let arm=false;
+      del.onclick=()=>{
+        if(!arm){arm=true;del.textContent='Confirmar';setTimeout(()=>{arm=false;del.textContent='Apagar'},3000);return}
+        store('cz2_hist',JSON.stringify(hist().filter(x=>x.id!==r.id)));renderHistory();toast('Treino apagado');
+      };
+    };
+    btn.onclick=()=>{if(det.hidden)open();else{det.hidden=true;btn.setAttribute('aria-expanded','false')}};
+    if(openId&&r.id===openId)open();
+  });
+}
+$('exportAll').onclick=()=>download(`treinos-backup-${stamp(Date.now())}.json`,JSON.stringify(hist(),null,1),'application/json');
 
 /* ---------- Bluetooth ---------- */
 function setConn(txt,state){$('pillTxt').textContent=txt;$('pill').className='pill '+(state||'')}
@@ -402,34 +546,43 @@ $('demoBtn').onclick=()=>{
 };
 
 /* ---------- gráfico ---------- */
-function draw(){
-  const cv=$('chart'),dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;
+function drawChart(cv,pts,bands,total,maxv){
+  const dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;
   if(!w)return;
   cv.width=w*dpr;cv.height=h*dpr;const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
   const css=getComputedStyle(document.documentElement),tok=n=>css.getPropertyValue(n).trim();
   const left=30,right=6,top=6,bottom=18,pw=w-left-right,ph=h-top-bottom;
-  const lo=Math.min(80,...series.map(p=>p.bpm-5)),hi=Math.max(180,stat.max+5);
-  const y=v=>top+ph*(1-(v-lo)/(hi-lo)),x=s=>left+pw*s/TOTAL;
+  let lo=80;pts.forEach(p=>{if(p[1]-5<lo)lo=p[1]-5});
+  const hi=Math.max(180,(maxv||0)+5);
+  const y=v=>top+ph*(1-(v-lo)/(hi-lo)),x=s=>left+pw*s/total;
   g.font='11px '+tok('--body');g.fillStyle=tok('--muted');g.strokeStyle=tok('--line');g.lineWidth=1;
   for(let v=Math.ceil(lo/20)*20;v<=hi;v+=20){g.beginPath();g.moveTo(left,y(v));g.lineTo(w-right,y(v));g.stroke();g.fillText(v,2,y(v)+4)}
   g.fillStyle=tok('--band');
-  phases.forEach(p=>g.fillRect(x(p.from),y(p.hi),x(p.to)-x(p.from),y(p.lo)-y(p.hi)));
+  bands.forEach(([a,b,l,u])=>g.fillRect(x(a),y(u),x(b)-x(a),y(l)-y(u)));
   g.fillStyle=tok('--muted');
-  const step=TOTAL<=1800?5:10;
-  for(let m=0;m<=TOTAL/60;m+=step){const xx=x(m*60);g.textAlign=m===0?'left':m===TOTAL/60?'right':'center';g.fillText(m,xx,h-4)}
+  const mins=total/60,step=mins<=30?5:10;
+  for(let m=0;m<=mins;m+=step){g.textAlign=m===0?'left':m===mins?'right':'center';g.fillText(m,x(m*60),h-4)}
   g.textAlign='left';
-  if(series.length>1){
+  if(pts.length>1){
     g.strokeStyle=tok('--accent');g.lineWidth=2;g.lineJoin='round';g.beginPath();
-    series.forEach((p,k)=>k?g.lineTo(x(p.s),y(p.bpm)):g.moveTo(x(p.s),y(p.bpm)));g.stroke();
-    const l=series[series.length-1];g.fillStyle=tok('--accent');g.beginPath();g.arc(x(l.s),y(l.bpm),3.5,0,7);g.fill();
+    pts.forEach((p,k)=>k?g.lineTo(x(p[0]),y(p[1])):g.moveTo(x(p[0]),y(p[1])));g.stroke();
+    const l=pts[pts.length-1];g.fillStyle=tok('--accent');g.beginPath();g.arc(x(l[0]),y(l[1]),3.5,0,7);g.fill();
   }
 }
+function draw(){drawChart($('chart'),series,phases.map(p=>[p.from,p.to,p.lo,p.hi]),TOTAL,stat.max)}
 window.addEventListener('resize',draw);
-try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw)}catch(e){}
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',()=>{draw();renderHistory()})}catch(e){}
 
-['age','rest','mode','dur','inten','sound'].forEach(k=>{const v=load('cz2_'+k);if(v)$(k).value=v;$(k).addEventListener('change',()=>{if((k==='dur'||k==='mode')&&elapsed()>0){$(k).value=load('cz2_'+k);$('resetNote').textContent='Zere o treino antes de trocar o tipo ou a duração.';$('resetNote').hidden=false;return}build()})});
+/* ---------- início ---------- */
+SETTINGS.forEach(k=>{
+  const v=load('cz2_'+k);if(v)$(k).value=v;
+  $(k).addEventListener('change',()=>{
+    if((k==='dur'||k==='mode')&&elapsed()>0&&!saved){$(k).value=load('cz2_'+k);note('Finalize o treino antes de trocar o tipo ou a duração.');return}
+    build();
+  });
+});
 if(!navigator.bluetooth){$('btNote').innerHTML='<span class="warn">Bluetooth indisponível aqui.</span> Abra pelo link https no Chrome do Android.'}
-build();
+build();restore();renderHistory();
 </script>
 </body>
 </html>
