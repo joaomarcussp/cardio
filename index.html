@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#10131b">
+<title>Cardio Zona 2</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Archivo:wght@400;500;600&display=swap">
+<style>
+/* Layout: one-column workout console — live pulse on top, clock, controls at thumb height, history and setup below */
+:root{
+  --bg:#eef0f4; --panel:#ffffff; --fg:#151a24; --muted:#5d6577; --line:#d6dae3;
+  --accent:#d6334a; --band:rgba(79,154,122,.18);
+  --ok:#1f8a5b; --low:#2f6fd0; --high:#d24a1f;
+  --z1:#9fb3c8; --z2:#4f9a7a; --z3:#d9a23b; --z4:#e0703a; --z5:#c8323f;
+  --display:"Chakra Petch","Roboto Mono",ui-monospace,monospace;
+  --body:"Archivo",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#10131b; --panel:#181d28; --fg:#eef1f6; --muted:#9aa3b5; --line:#2a3141;
+  --accent:#ff5a6e; --band:rgba(69,197,138,.16);
+  --ok:#45c58a; --low:#6aa5ff; --high:#ff7a4a;
+  --z1:#6c7f96; --z2:#3f9a76; --z3:#c9962f; --z4:#d8692f; --z5:#e04656; color-scheme:dark}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--body);font-size:15px;line-height:1.45;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  padding-top:calc(14px + env(safe-area-inset-top,0px));padding-bottom:calc(28px + env(safe-area-inset-bottom,0px))}
+.wrap{max-width:460px;margin:0 auto;display:flex;flex-direction:column;gap:12px}
+header{display:flex;justify-content:space-between;align-items:center;gap:8px}
+h1{font-family:var(--display);font-size:1.3rem;font-weight:700;letter-spacing:.02em;margin:0}
+.pill{font-size:.78rem;font-weight:600;padding:5px 10px;border-radius:999px;border:1px solid var(--line);color:var(--muted);display:flex;align-items:center;gap:6px;max-width:60%;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.pill i{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.pill.on{color:var(--fg)} .pill.on i{background:var(--ok)}
+.pill.wait i{background:var(--z3);animation:blink 1s infinite}
+@keyframes blink{50%{opacity:.25}}
+.lbl{font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:600}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:16px}
+.num{font-family:var(--display);font-variant-numeric:tabular-nums}
+
+.live{display:grid;grid-template-columns:1fr auto;gap:4px 12px;align-items:end}
+.hr{font-size:5rem;line-height:.9;font-weight:700;color:var(--fg)}
+.hr small{font-size:1rem;color:var(--muted);margin-left:4px}
+.live.low .hr{color:var(--low)} .live.high .hr{color:var(--high)} .live.in .hr{color:var(--ok)}
+.cue{font-family:var(--display);font-weight:700;font-size:1.5rem;text-align:right;letter-spacing:.04em}
+.live.low .cue{color:var(--low)} .live.high .cue{color:var(--high)} .live.in .cue{color:var(--ok)}
+.tgt{grid-column:1/-1;display:flex;justify-content:space-between;color:var(--muted);font-size:.9rem}
+.tgt b{color:var(--fg)}
+.zbar{grid-column:1/-1;position:relative;display:grid;grid-template-columns:repeat(5,1fr);gap:3px;margin-top:10px}
+.zbar div{height:10px;border-radius:3px;opacity:.4}
+.zbar div.on{opacity:1}
+.marker{position:absolute;top:-6px;width:4px;height:22px;background:var(--fg);border-radius:2px;transform:translateX(-50%);transition:left .4s}
+.zlab{grid-column:1/-1;display:grid;grid-template-columns:repeat(5,1fr);font-size:.7rem;color:var(--muted)}
+
+.clock{display:flex;flex-direction:column;gap:4px}
+.time{font-size:3.4rem;font-weight:600;line-height:1;text-align:center}
+.sub{display:flex;justify-content:space-between;font-size:.9rem;color:var(--muted)}
+.phase{font-weight:600;color:var(--fg)}
+.track{display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--line);position:relative;margin-top:8px}
+.track span{height:100%}
+.fill{position:absolute;inset:0 auto 0 0;background:var(--fg);opacity:.3;width:0}
+
+.controls{display:grid;grid-template-columns:2fr 1fr;gap:10px}
+button{font:inherit;font-weight:600;border-radius:12px;border:1px solid var(--line);background:var(--panel);color:var(--fg);padding:15px;cursor:pointer}
+button.primary{background:var(--accent);color:#fff;border-color:var(--accent);font-family:var(--display);font-size:1.25rem;letter-spacing:.04em}
+button.bt{width:100%;border-color:var(--fg)}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.note{font-size:.8rem;color:var(--muted);margin:0}
+.warn{color:var(--high);font-weight:600}
+
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;text-align:center;margin-top:10px}
+.stats b{display:block;font-family:var(--display);font-size:1.5rem;font-variant-numeric:tabular-nums}
+canvas{width:100%;height:150px;display:block;margin-top:8px}
+
+details summary{cursor:pointer;font-weight:600;list-style:none;display:flex;justify-content:space-between}
+details summary::-webkit-details-marker{display:none}
+details summary::after{content:"Abrir";color:var(--accent);font-size:.85rem}
+details[open] summary::after{content:"Fechar"}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+.grid label{display:flex;flex-direction:column;gap:4px;font-size:.85rem;color:var(--muted)}
+.grid .full{grid-column:1/-1}
+input,select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:11px;min-width:0;width:100%}
+.row{display:flex;gap:10px;margin-top:10px}
+.row input{flex:1;font-family:var(--display);font-size:1.2rem}
+.row button{padding:11px 16px}
+@media (prefers-reduced-motion:reduce){.marker{transition:none}.pill.wait i{animation:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>Cardio Zona 2</h1>
+    <span class="pill" id="pill"><i></i><span id="pillTxt">Pulseira desconectada</span></span>
+  </header>
+
+  <button class="bt" id="btBtn">Conectar pulseira</button>
+  <p class="note" id="btNote">Na pulseira: Configurações › HR Data Broadcasts › ativar. Depois toque em Conectar.</p>
+
+  <section class="panel live" id="live" aria-live="polite">
+    <div class="hr num"><span id="hr">--</span><small>bpm</small></div>
+    <div class="cue" id="cue">SEM SINAL</div>
+    <div class="tgt"><span>Faixa alvo <b class="num" id="tgt">—</b></span><span id="zname">—</span></div>
+    <div class="zbar" id="zbar">
+      <div style="background:var(--z1)"></div><div style="background:var(--z2)"></div><div style="background:var(--z3)"></div><div style="background:var(--z4)"></div><div style="background:var(--z5)"></div>
+      <span class="marker" id="marker" hidden></span>
+    </div>
+    <div class="zlab"><span>Z1</span><span>Z2</span><span>Z3</span><span>Z4</span><span>Z5</span></div>
+  </section>
+
+  <section class="panel clock">
+    <div class="sub"><span class="phase" id="phaseName">Aquecimento</span><span class="num" id="phaseLeft">5:00 na fase</span></div>
+    <div class="time num" id="time">00:00</div>
+    <div class="sub"><span>decorrido</span><span class="num" id="remain">faltam 60:00</span></div>
+    <div class="track" id="track"><i class="fill" id="fill"></i></div>
+  </section>
+
+  <div class="controls">
+    <button class="primary" id="startBtn">INICIAR</button>
+    <button id="resetBtn">Zerar</button>
+  </div>
+  <p class="note" id="resetNote" hidden>Toque em Zerar de novo para confirmar.</p>
+
+  <section class="panel">
+    <span class="lbl">Batimentos no treino</span>
+    <canvas id="chart" aria-label="Gráfico de batimentos com a faixa alvo"></canvas>
+    <div class="stats">
+      <div><b id="sIn">0%</b><span class="note">na faixa</span></div>
+      <div><b id="sAvg">--</b><span class="note">média</span></div>
+      <div><b id="sMax">--</b><span class="note">máxima</span></div>
+    </div>
+  </section>
+
+  <details class="panel" id="cfg" open>
+    <summary>Seus dados e avisos</summary>
+    <div class="grid">
+      <label>Idade<input id="age" type="number" inputmode="numeric" min="14" max="90" value="30"></label>
+      <label>FC repouso (opcional)<input id="rest" type="number" inputmode="numeric" min="35" max="110" placeholder="ex.: 62"></label>
+      <label>Duração
+        <select id="dur"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>60 min</option></select>
+      </label>
+      <label>Intensidade
+        <select id="inten"><option value="z2">Zona 2 · 60–70%</option><option value="z2h">Zona 2 alta · 65–75%</option></select>
+      </label>
+      <label class="full">Avisos
+        <select id="sound"><option value="voice">Voz + vibração</option><option value="beep">Bipe + vibração</option><option value="off">Silencioso</option></select>
+      </label>
+    </div>
+    <p class="note" style="margin-top:10px">FC máx estimada por 208 − 0,7 × idade. Com FC de repouso, usa reserva cardíaca (Karvonen). O app avisa quando você fica 12 s fora da faixa e repete a cada 30 s.</p>
+  </details>
+
+  <details class="panel">
+    <summary>Sem pulseira ou testando</summary>
+    <div class="row">
+      <input id="hrIn" type="number" inputmode="numeric" min="40" max="220" placeholder="bpm" aria-label="Batimento digitado">
+      <button id="hrBtn">Usar</button>
+    </div>
+    <div class="row"><button id="demoBtn" style="flex:1">Simular batimentos (teste)</button></div>
+  </details>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const store=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}};
+const load=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+
+let TOTAL=3600, phases=[];
+let running=false,startT=0,acc=0,timer=null,lastPhase=-1,lastSec=-1,wake=null,resetArmed=false;
+let readings=[], source='none', series=[], stat={inS:0,n:0,sum:0,max:0};
+let zstate='in', outSince=0, lastCue=0, cuedOut=false, phaseStart=0;
+let device=null, hrChar=null, userDisc=false, retries=0, demoTimer=null;
+
+/* ---------- zonas ---------- */
+function cfg(){
+  const age=Math.min(90,Math.max(14,+$('age').value||30));
+  const rest=+$('rest').value||0, max=Math.round(208-0.7*age);
+  const useK=rest>=35&&rest<max-40;
+  return {rest,max,useK,bpm:p=>Math.round(useK?rest+(max-rest)*p:max*p)};
+}
+function build(){
+  const c=cfg(), hi=$('inten').value==='z2h', dur=+$('dur').value;
+  TOTAL=dur*60;
+  const main=hi?[.65,.75]:[.60,.70];
+  phases=[
+    {name:'Aquecimento',from:0,to:300,p:[.50,.60],zone:'Zona 1 · leve',col:'--z1'},
+    {name:'Bloco principal',from:300,to:TOTAL-300,p:main,zone:hi?'Zona 2 alta':'Zona 2',col:'--z2'},
+    {name:'Desaquecimento',from:TOTAL-300,to:TOTAL,p:[.50,.60],zone:'Zona 1 · desacelere',col:'--z1'}
+  ].map(ph=>({...ph,lo:c.bpm(ph.p[0]),hi:c.bpm(ph.p[1])}));
+  $('track').querySelectorAll('span').forEach(s=>s.remove());
+  phases.forEach(ph=>{const s=document.createElement('span');s.style.width=((ph.to-ph.from)/TOTAL*100)+'%';s.style.background=`var(${ph.col})`;$('track').insertBefore(s,$('fill'))});
+  ['age','rest','dur','inten','sound'].forEach(k=>store('cz2_'+k,$(k).value));
+  tick(); renderLive(); draw();
+}
+const fmt=s=>{s=Math.max(0,Math.floor(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
+const elapsed=()=>Math.min(TOTAL,acc+(running?(Date.now()-startT)/1000:0));
+const phaseAt=t=>t>=TOTAL?phases.length-1:Math.max(0,phases.findIndex(p=>t>=p.from&&t<p.to));
+function pctOf(bpm){const c=cfg();return c.useK?(bpm-c.rest)/(c.max-c.rest):bpm/c.max}
+
+/* ---------- batimento atual ---------- */
+function currentHR(){
+  const now=Date.now(), staleMs=source==='manual'?120000:10000;
+  const recent=readings.filter(r=>now-r.t<=6000);
+  if(recent.length) return Math.round(recent.reduce((a,r)=>a+r.bpm,0)/recent.length);
+  const last=readings[readings.length-1];
+  return last&&now-last.t<=staleMs?last.bpm:null;
+}
+function onHR(bpm){
+  if(!bpm||bpm<30||bpm>230)return;
+  const now=Date.now();readings.push({t:now,bpm});
+  readings=readings.filter(r=>now-r.t<=130000);
+  renderLive();
+}
+function classify(hr,ph){
+  const m=zstate==='in'?2:0;
+  if(hr<ph.lo-m)return 'low'; if(hr>ph.hi+m)return 'high'; return 'in';
+}
+function renderLive(){
+  const ph=phases[phaseAt(elapsed())], hr=currentHR(), live=$('live');
+  $('tgt').textContent=ph.lo+'–'+ph.hi; $('zname').textContent=ph.zone;
+  const zbars=[...$('zbar').querySelectorAll('div')];
+  if(hr==null){
+    $('hr').textContent='--'; live.className='panel live'; $('cue').textContent=source==='none'?'SEM SINAL':'AGUARDANDO';
+    $('marker').hidden=true; zbars.forEach(d=>d.classList.remove('on')); return;
+  }
+  $('hr').textContent=hr;
+  const st=hr<ph.lo?'low':hr>ph.hi?'high':'in';
+  live.className='panel live '+st;
+  $('cue').textContent={low:'ACELERE ▲',in:'MANTENHA',high:'REDUZA ▼'}[st];
+  const p=pctOf(hr), zi=p<.6?0:p<.7?1:p<.8?2:p<.9?3:4;
+  zbars.forEach((d,k)=>d.classList.toggle('on',k===zi));
+  const m=$('marker');m.hidden=false;m.style.left=Math.min(100,Math.max(0,(p-.5)/.5*100))+'%';
+}
+
+/* ---------- avisos ---------- */
+let actx=null, ptVoice=null;
+function pickVoice(){try{const v=speechSynthesis.getVoices();ptVoice=v.find(x=>/pt[-_]BR/i.test(x.lang))||v.find(x=>/^pt/i.test(x.lang))||null}catch(e){}}
+try{speechSynthesis.onvoiceschanged=pickVoice;pickVoice()}catch(e){}
+function beep(n=2,f=880){
+  try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();
+    for(let k=0;k<n;k++){const o=actx.createOscillator(),g=actx.createGain();o.frequency.value=f;o.connect(g);g.connect(actx.destination);const s=actx.currentTime+k*.28;g.gain.setValueAtTime(.0001,s);g.gain.exponentialRampToValueAtTime(.4,s+.02);g.gain.exponentialRampToValueAtTime(.0001,s+.2);o.start(s);o.stop(s+.22)}}catch(e){}
+}
+function vib(p){try{navigator.vibrate&&navigator.vibrate(p)}catch(e){}}
+function say(text,kind='info'){
+  const mode=$('sound').value; if(mode==='off')return;
+  vib(kind==='low'?[150,80,150]:kind==='high'?[400]:[250,120,250]);
+  if(mode==='voice'&&'speechSynthesis' in window){
+    try{speechSynthesis.cancel();const u=new SpeechSynthesisUtterance(text);u.lang='pt-BR';if(ptVoice)u.voice=ptVoice;u.rate=1.05;speechSynthesis.speak(u);return}catch(e){}
+  }
+  beep(kind==='low'?3:kind==='high'?1:2, kind==='high'?520:880);
+}
+function coach(hr,ph,now){
+  if(now-phaseStart<45000) return; // dá tempo do coração responder à troca de fase
+  const ns=classify(hr,ph);
+  if(ns!==zstate){
+    if(ns==='in'&&cuedOut){say('Boa. Na faixa.','in');cuedOut=false}
+    zstate=ns; outSince=now;
+  }
+  if(zstate!=='in'&&now-outSince>=12000&&now-lastCue>=30000){
+    say(zstate==='low'?`Acelere. ${hr}, alvo acima de ${ph.lo}.`:`Reduza. ${hr}, alvo abaixo de ${ph.hi}.`,zstate);
+    lastCue=now; cuedOut=true;
+  }
+}
+
+/* ---------- cronômetro ---------- */
+function tick(){
+  const t=elapsed(), i=phaseAt(t), ph=phases[i], now=Date.now();
+  $('time').textContent=fmt(t);
+  $('remain').textContent='faltam '+fmt(TOTAL-t);
+  $('phaseName').textContent=t>=TOTAL?'Concluído':ph.name;
+  $('phaseLeft').textContent=t>=TOTAL?`${TOTAL/60} min feitos`:fmt(ph.to-t)+' na fase';
+  $('fill').style.width=(t/TOTAL*100)+'%';
+  if(running&&lastPhase!==-1&&i!==lastPhase&&t<TOTAL){phaseStart=now;zstate='in';say(`${ph.name}. Faixa ${ph.lo} a ${ph.hi}.`)}
+  lastPhase=i;
+  const s=Math.floor(t);
+  if(running&&s!==lastSec){
+    lastSec=s;
+    const hr=currentHR();
+    if(hr!=null){
+      series.push({s,bpm:hr});
+      stat.n++;stat.sum+=hr;stat.max=Math.max(stat.max,hr);
+      if(hr>=ph.lo&&hr<=ph.hi)stat.inS++;
+      coach(hr,ph,now);
+      if(s>0&&s%300===0&&s<TOTAL&&$('sound').value==='voice')say(`${s/60} minutos. Batimento ${hr}.`);
+    }
+    renderStats(); draw();
+  }
+  renderLive();
+  if(t>=TOTAL&&running){
+    running=false;acc=TOTAL;$('startBtn').textContent='FIM';releaseWake();
+    say(`Treino concluído. ${stat.n?Math.round(stat.inS/stat.n*100):0} por cento do tempo na faixa.`);
+  }
+}
+function renderStats(){
+  $('sIn').textContent=stat.n?Math.round(stat.inS/stat.n*100)+'%':'0%';
+  $('sAvg').textContent=stat.n?Math.round(stat.sum/stat.n):'--';
+  $('sMax').textContent=stat.max||'--';
+}
+setInterval(()=>{tick()},250);
+
+async function getWake(){try{wake=await navigator.wakeLock.request('screen')}catch(e){wake=null}}
+function releaseWake(){try{wake&&wake.release()}catch(e){}wake=null}
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&running)getWake()});
+
+$('startBtn').onclick=()=>{
+  if(elapsed()>=TOTAL)return;
+  try{actx=actx||new (window.AudioContext||window.webkitAudioContext)();actx.resume()}catch(e){}
+  if(running){acc=elapsed();running=false;$('startBtn').textContent='CONTINUAR';releaseWake();say('Pausado.')}
+  else{
+    const first=elapsed()===0;
+    startT=Date.now();running=true;$('startBtn').textContent='PAUSAR';getWake();
+    if(first){phaseStart=Date.now();const ph=phases[0];say(`Começando. ${ph.name}, faixa ${ph.lo} a ${ph.hi}.`)}
+  }
+  $('cfg').open=false; tick();
+};
+$('resetBtn').onclick=()=>{
+  if(elapsed()>0&&!resetArmed){resetArmed=true;$('resetNote').hidden=false;setTimeout(()=>{resetArmed=false;$('resetNote').hidden=true},3000);return}
+  resetArmed=false;$('resetNote').hidden=true;running=false;acc=0;lastPhase=-1;lastSec=-1;
+  series=[];stat={inS:0,n:0,sum:0,max:0};zstate='in';cuedOut=false;lastCue=0;
+  $('startBtn').textContent='INICIAR';releaseWake();renderStats();tick();draw();
+};
+
+/* ---------- Bluetooth ---------- */
+function setConn(txt,state){$('pillTxt').textContent=txt;$('pill').className='pill '+(state||'')}
+function parseHR(dv){const f=dv.getUint8(0);return (f&1)?dv.getUint16(1,true):dv.getUint8(1)}
+function onChar(e){onHR(parseHR(e.target.value))}
+async function attach(){
+  setConn('Conectando…','wait');
+  const server=await device.gatt.connect();
+  const svc=await server.getPrimaryService('heart_rate');
+  if(hrChar)hrChar.removeEventListener('characteristicvaluechanged',onChar);
+  hrChar=await svc.getCharacteristic('heart_rate_measurement');
+  hrChar.addEventListener('characteristicvaluechanged',onChar);
+  await hrChar.startNotifications();
+  source='bt';retries=0;setConn(device.name||'Pulseira','on');
+  $('btBtn').textContent='Desconectar pulseira';$('btNote').hidden=true;
+}
+function onDisc(){
+  if(userDisc){setConn('Pulseira desconectada','');return}
+  if(retries===0&&running)say('Pulseira desconectada. Tentando reconectar.');
+  retries++;
+  if(retries>6){setConn('Desconectado · toque em Conectar','');$('btBtn').textContent='Conectar pulseira';$('btNote').hidden=false;return}
+  setConn(`Reconectando (${retries}/6)…`,'wait');
+  setTimeout(()=>attach().catch(onDisc),1500*retries);
+}
+$('btBtn').onclick=async()=>{
+  if(device&&device.gatt.connected){userDisc=true;device.gatt.disconnect();source='none';$('btBtn').textContent='Conectar pulseira';$('btNote').hidden=false;return}
+  if(!navigator.bluetooth){
+    $('btNote').innerHTML='<span class="warn">Bluetooth indisponível neste navegador.</span> Abra este endereço no Chrome do Android (link https) com o Bluetooth e a localização ligados.';
+    $('btNote').hidden=false;return;
+  }
+  stopDemo();
+  try{
+    userDisc=false;setConn('Procurando…','wait');
+    device=await navigator.bluetooth.requestDevice({filters:[{services:['heart_rate']},{namePrefix:'HUAWEI'},{namePrefix:'Huawei'}],optionalServices:['heart_rate']});
+    device.addEventListener('gattserverdisconnected',onDisc);
+    await attach();
+  }catch(e){
+    if(e.name==='NotFoundError')setConn('Nenhuma pulseira escolhida','');
+    else{setConn('Falha ao conectar','');$('btNote').innerHTML='<span class="warn">'+(e.message||e.name)+'</span> Confira se o HR Data Broadcasts está ativo na pulseira.';$('btNote').hidden=false}
+  }
+};
+
+/* ---------- manual e simulação ---------- */
+$('hrBtn').onclick=()=>{const v=+$('hrIn').value;if(v>=40&&v<=220){stopDemo();source='manual';readings=[];onHR(v)}};
+$('hrIn').addEventListener('keydown',e=>{if(e.key==='Enter')$('hrBtn').click()});
+function stopDemo(){if(demoTimer){clearInterval(demoTimer);demoTimer=null;$('demoBtn').textContent='Simular batimentos (teste)';if(source==='demo'){source='none';setConn('Pulseira desconectada','')}}}
+$('demoBtn').onclick=()=>{
+  if(demoTimer){stopDemo();return}
+  source='demo';setConn('Simulação','on');$('demoBtn').textContent='Parar simulação';
+  let hr=95,target=110;
+  demoTimer=setInterval(()=>{
+    if(Math.random()<.04){const ph=phases[phaseAt(elapsed())];target=ph.lo+(Math.random()*1.6-.3)*(ph.hi-ph.lo)}
+    hr+=(target-hr)*.08+(Math.random()-.5)*2.5;onHR(Math.round(hr));
+  },1000);
+};
+
+/* ---------- gráfico ---------- */
+function draw(){
+  const cv=$('chart'),dpr=window.devicePixelRatio||1,w=cv.clientWidth,h=cv.clientHeight;
+  if(!w)return;
+  cv.width=w*dpr;cv.height=h*dpr;const g=cv.getContext('2d');g.setTransform(dpr,0,0,dpr,0,0);
+  const css=getComputedStyle(document.documentElement),tok=n=>css.getPropertyValue(n).trim();
+  const left=30,right=6,top=6,bottom=18,pw=w-left-right,ph=h-top-bottom;
+  const lo=Math.min(80,...series.map(p=>p.bpm-5)),hi=Math.max(180,stat.max+5);
+  const y=v=>top+ph*(1-(v-lo)/(hi-lo)),x=s=>left+pw*s/TOTAL;
+  g.font='11px '+tok('--body');g.fillStyle=tok('--muted');g.strokeStyle=tok('--line');g.lineWidth=1;
+  for(let v=Math.ceil(lo/20)*20;v<=hi;v+=20){g.beginPath();g.moveTo(left,y(v));g.lineTo(w-right,y(v));g.stroke();g.fillText(v,2,y(v)+4)}
+  g.fillStyle=tok('--band');
+  phases.forEach(p=>g.fillRect(x(p.from),y(p.hi),x(p.to)-x(p.from),y(p.lo)-y(p.hi)));
+  g.fillStyle=tok('--muted');
+  const step=TOTAL<=1800?5:10;
+  for(let m=0;m<=TOTAL/60;m+=step){const xx=x(m*60);g.textAlign=m===0?'left':m===TOTAL/60?'right':'center';g.fillText(m,xx,h-4)}
+  g.textAlign='left';
+  if(series.length>1){
+    g.strokeStyle=tok('--accent');g.lineWidth=2;g.lineJoin='round';g.beginPath();
+    series.forEach((p,k)=>k?g.lineTo(x(p.s),y(p.bpm)):g.moveTo(x(p.s),y(p.bpm)));g.stroke();
+    const l=series[series.length-1];g.fillStyle=tok('--accent');g.beginPath();g.arc(x(l.s),y(l.bpm),3.5,0,7);g.fill();
+  }
+}
+window.addEventListener('resize',draw);
+try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw)}catch(e){}
+
+['age','rest','dur','inten','sound'].forEach(k=>{const v=load('cz2_'+k);if(v)$(k).value=v;$(k).addEventListener('change',()=>{if(k==='dur'&&elapsed()>0){$(k).value=TOTAL/60;return}build()})});
+if(!navigator.bluetooth){$('btNote').innerHTML='<span class="warn">Bluetooth indisponível aqui.</span> Abra pelo link https no Chrome do Android.'}
+build();
+</script>
+</body>
+</html>
