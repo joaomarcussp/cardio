@@ -135,8 +135,11 @@ input,select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid 
   <details class="panel" id="cfg" open>
     <summary>Seus dados e avisos</summary>
     <div class="grid">
-      <label>Idade<input id="age" type="number" inputmode="numeric" min="14" max="90" value="30"></label>
-      <label>FC repouso (opcional)<input id="rest" type="number" inputmode="numeric" min="35" max="110" placeholder="ex.: 62"></label>
+      <label>Idade<input id="age" type="number" inputmode="numeric" min="14" max="90" value="34"></label>
+      <label>FC repouso (opcional)<input id="rest" type="number" inputmode="numeric" min="35" max="110" value="70"></label>
+      <label class="full">Treino
+        <select id="mode"><option value="cont">Contínuo · Zona 2</option><option value="hiit">HIIT spinning · 30 min (6 tiros)</option></select>
+      </label>
       <label>Duração
         <select id="dur"><option value="30">30 min</option><option value="45">45 min</option><option value="60" selected>60 min</option></select>
       </label>
@@ -178,18 +181,32 @@ function cfg(){
   const useK=rest>=35&&rest<max-40;
   return {rest,max,useK,bpm:p=>Math.round(useK?rest+(max-rest)*p:max*p)};
 }
+const HIIT={warm:7,reps:6,work:1,rest:2,cool:5};
 function build(){
-  const c=cfg(), hi=$('inten').value==='z2h', dur=+$('dur').value;
-  TOTAL=dur*60;
-  const main=hi?[.65,.75]:[.60,.70];
-  phases=[
-    {name:'Aquecimento',from:0,to:300,p:[.50,.60],zone:'Zona 1 · leve',col:'--z1'},
-    {name:'Bloco principal',from:300,to:TOTAL-300,p:main,zone:hi?'Zona 2 alta':'Zona 2',col:'--z2'},
-    {name:'Desaquecimento',from:TOTAL-300,to:TOTAL,p:[.50,.60],zone:'Zona 1 · desacelere',col:'--z1'}
-  ].map(ph=>({...ph,lo:c.bpm(ph.p[0]),hi:c.bpm(ph.p[1])}));
+  const c=cfg(), hiit=$('mode').value==='hiit', hi=$('inten').value==='z2h';
+  $('dur').disabled=hiit; $('inten').disabled=hiit;
+  if(hiit){
+    const P=[]; let t=0; const add=(o,min)=>{P.push({...o,from:t,to:t+min*60});t+=min*60};
+    add({name:'Aquecimento',kind:'warm',p:[.50,.65],zone:'Progressivo · cadência 85–95',col:'--z2'},HIIT.warm);
+    for(let r=1;r<=HIIT.reps;r++){
+      add({name:`Tiro ${r} de ${HIIT.reps}`,kind:'work',p:[.85,.90],zone:r%2?'Sentado · 100–110 rpm':'Em pé · carga alta 60–75 rpm',col:'--z4'},HIIT.work);
+      add({name:`Recuperação ${r}`,kind:'rest',p:[.50,.65],zone:'Carga leve · 75–85 rpm',col:'--z1'},HIIT.rest);
+    }
+    add({name:'Desaquecimento',kind:'cool',p:[.40,.60],zone:'Bem leve · solte a perna',col:'--z1'},HIIT.cool);
+    phases=P; TOTAL=t;
+  }else{
+    TOTAL=+$('dur').value*60;
+    const main=hi?[.65,.75]:[.60,.70];
+    phases=[
+      {name:'Aquecimento',kind:'warm',from:0,to:300,p:[.50,.60],zone:'Zona 1 · leve',col:'--z1'},
+      {name:'Bloco principal',kind:'main',from:300,to:TOTAL-300,p:main,zone:hi?'Zona 2 alta':'Zona 2',col:'--z2'},
+      {name:'Desaquecimento',kind:'cool',from:TOTAL-300,to:TOTAL,p:[.50,.60],zone:'Zona 1 · desacelere',col:'--z1'}
+    ];
+  }
+  phases=phases.map(ph=>({...ph,lo:c.bpm(ph.p[0]),hi:c.bpm(ph.p[1])}));
   $('track').querySelectorAll('span').forEach(s=>s.remove());
   phases.forEach(ph=>{const s=document.createElement('span');s.style.width=((ph.to-ph.from)/TOTAL*100)+'%';s.style.background=`var(${ph.col})`;$('track').insertBefore(s,$('fill'))});
-  ['age','rest','dur','inten','sound'].forEach(k=>store('cz2_'+k,$(k).value));
+  ['age','rest','mode','dur','inten','sound'].forEach(k=>store('cz2_'+k,$(k).value));
   tick(); renderLive(); draw();
 }
 const fmt=s=>{s=Math.max(0,Math.floor(s));return String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0')};
@@ -226,7 +243,7 @@ function renderLive(){
   $('hr').textContent=hr;
   const st=hr<ph.lo?'low':hr>ph.hi?'high':'in';
   live.className='panel live '+st;
-  $('cue').textContent={low:'ACELERE ▲',in:'MANTENHA',high:'REDUZA ▼'}[st];
+  $('cue').textContent=ph.kind==='work'?{low:'FORÇA ▲',in:'NO ALVO',high:'NO LIMITE'}[st]:{low:'ACELERE ▲',in:'MANTENHA',high:'REDUZA ▼'}[st];
   const p=pctOf(hr), zi=p<.6?0:p<.7?1:p<.8?2:p<.9?3:4;
   zbars.forEach((d,k)=>d.classList.toggle('on',k===zi));
   const m=$('marker');m.hidden=false;m.style.left=Math.min(100,Math.max(0,(p-.5)/.5*100))+'%';
@@ -249,7 +266,13 @@ function say(text,kind='info'){
   }
   beep(kind==='low'?3:kind==='high'?1:2, kind==='high'?520:880);
 }
+function sayPhase(ph){
+  if(ph.kind==='work')say(`${ph.name}. Força!`,'high');
+  else if(ph.kind==='rest')say('Recuperação. Solta a perna.','low');
+  else say(`${ph.name}. Faixa ${ph.lo} a ${ph.hi}.`);
+}
 function coach(hr,ph,now){
+  if(ph.kind==='work') return; // no tiro o batimento sobe com atraso: guie pelo esforço
   if(now-phaseStart<45000) return; // dá tempo do coração responder à troca de fase
   const ns=classify(hr,ph);
   if(ns!==zstate){
@@ -270,18 +293,20 @@ function tick(){
   $('phaseName').textContent=t>=TOTAL?'Concluído':ph.name;
   $('phaseLeft').textContent=t>=TOTAL?`${TOTAL/60} min feitos`:fmt(ph.to-t)+' na fase';
   $('fill').style.width=(t/TOTAL*100)+'%';
-  if(running&&lastPhase!==-1&&i!==lastPhase&&t<TOTAL){phaseStart=now;zstate='in';say(`${ph.name}. Faixa ${ph.lo} a ${ph.hi}.`)}
+  if(running&&lastPhase!==-1&&i!==lastPhase&&t<TOTAL){phaseStart=now;zstate='in';sayPhase(ph)}
   lastPhase=i;
   const s=Math.floor(t);
   if(running&&s!==lastSec){
     lastSec=s;
+    const nx=phases[i+1];
+    if(nx&&nx.kind==='work'&&ph.to-s===10)say('Dez segundos para o tiro.');
     const hr=currentHR();
     if(hr!=null){
       series.push({s,bpm:hr});
       stat.n++;stat.sum+=hr;stat.max=Math.max(stat.max,hr);
       if(hr>=ph.lo&&hr<=ph.hi)stat.inS++;
       coach(hr,ph,now);
-      if(s>0&&s%300===0&&s<TOTAL&&$('sound').value==='voice')say(`${s/60} minutos. Batimento ${hr}.`);
+      if(s>0&&s%300===0&&s<TOTAL&&$('mode').value!=='hiit'&&$('sound').value==='voice')say(`${s/60} minutos. Batimento ${hr}.`);
     }
     renderStats(); draw();
   }
@@ -310,11 +335,12 @@ $('startBtn').onclick=()=>{
     const first=elapsed()===0;
     startT=Date.now();running=true;$('startBtn').textContent='PAUSAR';getWake();
     if(first){phaseStart=Date.now();const ph=phases[0];say(`Começando. ${ph.name}, faixa ${ph.lo} a ${ph.hi}.`)}
+    lastPhase=phaseAt(elapsed());
   }
   $('cfg').open=false; tick();
 };
 $('resetBtn').onclick=()=>{
-  if(elapsed()>0&&!resetArmed){resetArmed=true;$('resetNote').hidden=false;setTimeout(()=>{resetArmed=false;$('resetNote').hidden=true},3000);return}
+  if(elapsed()>0&&!resetArmed){resetArmed=true;$('resetNote').textContent='Toque em Zerar de novo para confirmar.';$('resetNote').hidden=false;setTimeout(()=>{resetArmed=false;$('resetNote').hidden=true},3000);return}
   resetArmed=false;$('resetNote').hidden=true;running=false;acc=0;lastPhase=-1;lastSec=-1;
   series=[];stat={inS:0,n:0,sum:0,max:0};zstate='in';cuedOut=false;lastCue=0;
   $('startBtn').textContent='INICIAR';releaseWake();renderStats();tick();draw();
@@ -401,7 +427,7 @@ function draw(){
 window.addEventListener('resize',draw);
 try{matchMedia('(prefers-color-scheme: dark)').addEventListener('change',draw)}catch(e){}
 
-['age','rest','dur','inten','sound'].forEach(k=>{const v=load('cz2_'+k);if(v)$(k).value=v;$(k).addEventListener('change',()=>{if(k==='dur'&&elapsed()>0){$(k).value=TOTAL/60;return}build()})});
+['age','rest','mode','dur','inten','sound'].forEach(k=>{const v=load('cz2_'+k);if(v)$(k).value=v;$(k).addEventListener('change',()=>{if((k==='dur'||k==='mode')&&elapsed()>0){$(k).value=load('cz2_'+k);$('resetNote').textContent='Zere o treino antes de trocar o tipo ou a duração.';$('resetNote').hidden=false;return}build()})});
 if(!navigator.bluetooth){$('btNote').innerHTML='<span class="warn">Bluetooth indisponível aqui.</span> Abra pelo link https no Chrome do Android.'}
 build();
 </script>
